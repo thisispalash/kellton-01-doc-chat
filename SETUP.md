@@ -58,7 +58,7 @@ EOF
 poetry run python run.py
 ```
 
-The backend will start on `http://localhost:5000`
+The backend will start on `http://localhost:5001`
 
 ## Frontend Setup
 
@@ -74,7 +74,7 @@ pnpm install
 
 3. Create a `.env.local` file:
 ```bash
-echo "NEXT_PUBLIC_API_URL=http://localhost:5000" > .env.local
+echo "NEXT_PUBLIC_API_URL=http://localhost:5001" > .env.local
 ```
 
 4. Run the development server:
@@ -210,7 +210,7 @@ interface/
 ### Frontend Issues
 
 1. **Connection Errors:**
-   - Ensure backend is running on port 5000
+   - Ensure backend is running on port 5001
    - Check `.env.local` has correct API URL
 
 2. **WebSocket Issues:**

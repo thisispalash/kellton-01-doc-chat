@@ -246,7 +246,7 @@ See SETUP.md for complete API documentation.
    ```bash
    cd interface
    pnpm install
-   echo "NEXT_PUBLIC_API_URL=http://localhost:5000" > .env.local
+   echo "NEXT_PUBLIC_API_URL=http://localhost:5001" > .env.local
    pnpm dev
    ```
 

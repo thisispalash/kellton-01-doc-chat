@@ -57,7 +57,7 @@ def create_app(config_class=Config):
 def run_app():
     """Run the application with SocketIO."""
     app = create_app()
-    socketio.run(app, host='0.0.0.0', port=5000, debug=app.config['DEBUG'])
+    socketio.run(app, host='0.0.0.0', port=5001, debug=app.config['DEBUG'])
 
 
 if __name__ == '__main__':
