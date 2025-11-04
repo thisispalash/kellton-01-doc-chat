@@ -19,18 +19,24 @@ A fully functional, locally-hosted document chat application with user authentic
 - Local embedding generation using sentence-transformers
 - ChromaDB for vector storage (fully local)
 - Per-document collections for organized storage
+- **Conversation-Document Attachments:** Documents persist with conversations
+- **Split View:** Resizable PDF viewer alongside chat interface
+- **Authenticated PDF Serving:** Secure endpoint for viewing documents
 
 ### RAG (Retrieval Augmented Generation)
 - Cosine similarity search on user queries
-- Multi-document context support
+- Multi-document context support (conversation-attached documents)
 - Top-K relevant chunks retrieval
 - Automatic context building for LLM prompts
+- **Persistent Document Context:** Documents stay attached across sessions
 
 ### Chat System
 - Real-time WebSocket communication
 - Streaming LLM responses
 - Conversation history with persistence
 - Per-message model selection
+- **User-Specific API Keys:** Encrypted storage in database
+- **Smart Cleanup:** Empty conversations auto-deleted on switch
 - Support for 4 LLM providers:
   - OpenAI (GPT-4, GPT-4 Turbo, GPT-3.5)
   - Anthropic (Claude 3 Opus, Sonnet, Haiku)
@@ -38,13 +44,18 @@ A fully functional, locally-hosted document chat application with user authentic
   - Grok (xAI's models)
 
 ### User Interface
-- Modern, responsive design with Tailwind CSS
+- Modern, responsive design with Tailwind CSS and Radix UI
 - Dark mode support
 - Conversation sidebar with search
-- Document library with selection
+- Document library with attach/detach controls
+- **Resizable Split View:** PDF viewer + chat side-by-side
+- **Clickable Document Badges:** Quick access to attached PDFs
 - Real-time message streaming display
 - Markdown rendering for AI responses
 - Connection status indicator
+- **Settings Dialog:** Manage API keys for all providers
+- **Smart UX:** Click documents to create new conversations
+- **Auto-Cleanup:** Empty conversations removed automatically
 
 ## Architecture
 
@@ -55,7 +66,9 @@ A fully functional, locally-hosted document chat application with user authentic
 - **Embeddings:** sentence-transformers (all-MiniLM-L6-v2)
 - **PDF Processing:** pypdf
 - **Authentication:** bcrypt + session tokens
+- **Encryption:** Fernet (cryptography) for API key storage
 - **LLM APIs:** OpenAI, Anthropic, Google, Grok clients
+- **CORS:** Flask-CORS for cross-origin requests
 
 ### Frontend Stack
 - **Framework:** Next.js 16 (App Router)
@@ -65,6 +78,8 @@ A fully functional, locally-hosted document chat application with user authentic
 - **Real-time:** Socket.IO client
 - **Forms:** React Hook Form + Zod validation
 - **Markdown:** react-markdown
+- **PDF Viewing:** iframe-based with authenticated fetch
+- **Resizable Panels:** react-resizable-panels
 
 ## File Structure
 
@@ -74,8 +89,9 @@ A fully functional, locally-hosted document chat application with user authentic
 │   ├── src/backend/
 │   │   ├── api/
 │   │   │   ├── auth.py              # Auth endpoints
-│   │   │   ├── conversations.py     # Conversation CRUD
-│   │   │   ├── documents.py         # Document upload/management
+│   │   │   ├── conversations.py     # Conversation CRUD + attachments
+│   │   │   ├── documents.py         # Document upload/management/serving
+│   │   │   ├── settings.py          # API key management
 │   │   │   └── websocket.py         # WebSocket chat handler
 │   │   ├── auth/
 │   │   │   ├── middleware.py        # @require_auth decorator
@@ -90,7 +106,8 @@ A fully functional, locally-hosted document chat application with user authentic
 │   │   │   ├── embeddings.py        # Text extraction & embeddings
 │   │   │   └── search.py            # Vector search
 │   │   ├── utils/
-│   │   │   └── llm_providers.py     # Multi-provider LLM interface
+│   │   │   ├── llm_providers.py     # Multi-provider LLM interface
+│   │   │   └── encryption.py        # API key encryption/decryption
 │   │   ├── app.py                   # Flask app factory
 │   │   └── config.py                # Configuration
 │   ├── instance/                    # SQLite & ChromaDB data
@@ -109,11 +126,13 @@ A fully functional, locally-hosted document chat application with user authentic
 │   │   │   ├── ui/                  # Radix UI components
 │   │   │   ├── ChatArea.tsx         # Chat display & input
 │   │   │   ├── ConversationList.tsx # Conversation sidebar
-│   │   │   ├── DocumentList.tsx     # Document selection
+│   │   │   ├── DocumentList.tsx     # Document attach/detach controls
 │   │   │   ├── DocumentUpload.tsx   # Upload dialog
+│   │   │   ├── DocumentViewer.tsx   # PDF viewer component
 │   │   │   ├── LoginForm.tsx        # Auth form
 │   │   │   ├── MessageBubble.tsx    # Message display
 │   │   │   ├── ModelSelector.tsx    # LLM model dropdown
+│   │   │   ├── SettingsDialog.tsx   # API key management
 │   │   │   └── Sidebar.tsx          # Main sidebar
 │   │   ├── context/
 │   │   │   ├── AuthContext.tsx      # Auth state management
@@ -123,8 +142,11 @@ A fully functional, locally-hosted document chat application with user authentic
 │   │       └── api.ts               # API client
 │   └── package.json                 # Dependencies
 │
-├── SETUP.md                         # Setup instructions
-└── PROJECT_SUMMARY.md               # This file
+├── setup.sh                         # Automated setup script
+├── start.sh                         # Start both servers
+├── README.md                        # Quick start guide
+├── SETUP.md                         # Detailed setup instructions
+└── PROJECT_SUMMARY.md               # This file (complete implementation details)
 ```
 
 ## Database Schema
@@ -165,6 +187,20 @@ A fully functional, locally-hosted document chat application with user authentic
 - `chroma_collection_id`
 - `uploaded_at`
 
+### ApiKeys
+- `id` (primary key)
+- `user_id` (foreign key)
+- `provider` (openai/anthropic/google/grok)
+- `encrypted_key`
+- `created_at`
+- `updated_at`
+
+### ConversationDocuments (Junction Table)
+- `id` (primary key)
+- `conversation_id` (foreign key)
+- `document_id` (foreign key)
+- `attached_at`
+
 ## Key Implementation Details
 
 ### Password-First Authentication Flow
@@ -186,18 +222,24 @@ A fully functional, locally-hosted document chat application with user authentic
 8. Save document record in SQLite
 
 ### Chat with RAG Flow
-1. User types message and selects documents
-2. Frontend sends via WebSocket: `{conversation_id, message, model, selected_doc_ids}`
+1. User types message in a conversation
+2. Frontend sends via WebSocket: `{conversation_id, message, model}`
 3. Backend saves user message to database
-4. If documents selected:
+4. **Retrieve conversation's attached documents:**
+   - Query `conversation_documents` junction table
+   - Get document IDs for the current conversation
+5. **If documents attached:**
    - Generate query embedding
-   - Search each document collection (top 5 chunks per doc)
+   - Search each attached document's ChromaDB collection (top 5 chunks per doc)
    - Build context from retrieved chunks
-5. Construct LLM prompt with context + conversation history
-6. Stream response from selected LLM provider
-7. Emit chunks to frontend via WebSocket
-8. Save assistant response to database
-9. Update conversation timestamp
+6. **Retrieve user's API key:**
+   - Query encrypted API key from database for selected model provider
+   - Decrypt using Fernet
+7. Construct LLM prompt with context + conversation history
+8. Stream response from selected LLM provider using user's API key
+9. Emit chunks to frontend via WebSocket
+10. Save assistant response to database
+11. Update conversation timestamp
 
 ### WebSocket Communication
 - **Connection:** Authenticate with session token
@@ -215,11 +257,7 @@ See SETUP.md for complete API documentation.
 ## Environment Variables
 
 ### Backend (.env)
-- `FLASK_SECRET_KEY` - Flask session secret
-- `OPENAI_API_KEY` - OpenAI API key
-- `ANTHROPIC_API_KEY` - Anthropic API key
-- `GOOGLE_API_KEY` - Google API key
-- `GROK_API_KEY` - Grok API key
+- `FLASK_SECRET_KEY` - Flask session secret (also used for API key encryption)
 - `DATABASE_PATH` - SQLite database path
 - `UPLOADS_PATH` - File upload directory
 - `CHROMA_PATH` - ChromaDB storage path
@@ -229,16 +267,35 @@ See SETUP.md for complete API documentation.
 - `SESSION_EXPIRY_HOURS` - Session validity period
 - `CORS_ORIGINS` - Allowed CORS origins
 
+**Note:** LLM API keys are now stored per-user in the database (encrypted). Backend `.env` API keys are no longer required.
+
 ### Frontend (.env.local)
 - `NEXT_PUBLIC_API_URL` - Backend API URL
 
 ## Development Setup
 
+### Quick Start (Recommended)
+
+```bash
+# Clone and setup
+git clone <repository-url>
+cd 01-doc-chat
+chmod +x setup.sh start.sh
+
+# Install dependencies and create config files
+./setup.sh
+
+# Start both servers
+./start.sh
+```
+
+### Manual Setup
+
 1. **Backend:**
    ```bash
    cd backend
    poetry install
-   cp .env.example .env  # Edit with your API keys
+   # Create .env file (see SETUP.md for template)
    poetry run python run.py
    ```
 
@@ -250,7 +307,13 @@ See SETUP.md for complete API documentation.
    pnpm dev
    ```
 
-3. **Access:** http://localhost:3000
+3. **Configure API Keys:**
+   - Log in to the application
+   - Click Settings (gear icon) in the sidebar
+   - Enter your API keys for desired providers
+   - Keys are encrypted and stored in the database
+
+4. **Access:** http://localhost:3000
 
 ## Deployment Considerations
 
@@ -276,6 +339,16 @@ See SETUP.md for complete API documentation.
 - Consider worker queues (Celery) for PDF processing
 - Add CDN for frontend assets
 
+## Recent Enhancements (Completed)
+
+- [x] **User-Specific API Keys:** Encrypted storage in database per user
+- [x] **Persistent Document Attachments:** Documents stay with conversations across sessions
+- [x] **Split View:** Resizable PDF viewer alongside chat
+- [x] **Smart Conversation Cleanup:** Auto-delete empty conversations
+- [x] **Clickable Document Badges:** Quick PDF viewing from chat header
+- [x] **Settings Dialog:** Manage all provider API keys in one place
+- [x] **Improved UX:** Click documents to create conversations with them attached
+
 ## Future Enhancements
 
 ### Potential Features
@@ -289,6 +362,7 @@ See SETUP.md for complete API documentation.
 - [ ] Mobile app (React Native)
 - [ ] Admin dashboard
 - [ ] Usage analytics
+- [ ] Auto-generate conversation titles from first message
 
 ### Technical Improvements
 - [ ] Unit test coverage
@@ -330,7 +404,14 @@ See SETUP.md for complete API documentation.
 - [x] Message sending
 - [x] Streaming responses
 - [x] Model switching
-- [x] Document selection for RAG
+- [x] Document attachment/detachment
+- [x] Persistent document context
+- [x] PDF viewing in split view
+- [x] Resizable panels
+- [x] API key management
+- [x] Encrypted API key storage
+- [x] Empty conversation cleanup
+- [x] Clickable document badges
 - [x] Conversation deletion
 - [x] Document deletion
 - [x] Logout functionality
