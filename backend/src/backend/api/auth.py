@@ -24,6 +24,9 @@ def check_password():
     if not password:
         return jsonify({'error': 'Password is required'}), 400
     
+    if len(password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters'}), 400
+    
     db = get_db()
     
     # Check all users for password match
