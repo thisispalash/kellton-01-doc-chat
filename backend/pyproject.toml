@@ -21,7 +21,8 @@ dependencies = [
     "sqlalchemy>=2.0.25",
     "bcrypt>=4.1.2",
     "python-engineio>=4.9.0",
-    "python-socketio>=5.11.0"
+    "python-socketio>=5.11.0",
+    "cryptography>=41.0.0"
 ]
 
 [tool.poetry]

@@ -22,7 +22,9 @@ def create_app(config_class=Config):
         r"/api/*": {
             "origins": config_class.CORS_ORIGINS,
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
+            "allow_headers": ["Content-Type", "Authorization"],
+            "expose_headers": ["Content-Type", "Content-Disposition"],
+            "supports_credentials": True
         }
     })
     
@@ -38,10 +40,11 @@ def create_app(config_class=Config):
     init_db(app)
     
     # Register blueprints
-    from .api import auth_bp, documents_bp, conversations_bp
+    from .api import auth_bp, documents_bp, conversations_bp, settings_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(documents_bp, url_prefix='/api/documents')
     app.register_blueprint(conversations_bp, url_prefix='/api/conversations')
+    app.register_blueprint(settings_bp, url_prefix='/api/settings')
     
     # Register WebSocket events
     from .api import websocket

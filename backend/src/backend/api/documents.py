@@ -1,7 +1,8 @@
 """Document management API routes."""
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from werkzeug.utils import secure_filename
+from pathlib import Path
 from ..db import get_db, Document
 from ..auth import require_auth
 from ..storage import save_file, delete_file
@@ -161,4 +162,36 @@ def delete_document(current_user, doc_id):
     db.commit()
     
     return jsonify({'message': 'Document deleted'}), 200
+
+
+@documents_bp.route('/<int:doc_id>/view', methods=['GET'])
+@require_auth
+def view_document(current_user, doc_id):
+    """Serve a document file for viewing.
+    
+    Requires Authorization header with Bearer token.
+    
+    Args:
+        doc_id: Document ID
+        
+    Returns:
+        PDF file
+    """
+    db = get_db()
+    document = db.query(Document).filter_by(id=doc_id, user_id=current_user.id).first()
+    
+    if not document:
+        return jsonify({'error': 'Document not found'}), 404
+    
+    file_path = Path(document.file_path)
+    
+    if not file_path.exists():
+        return jsonify({'error': 'File not found on disk'}), 404
+    
+    return send_file(
+        str(file_path),
+        mimetype='application/pdf',
+        as_attachment=False,
+        download_name=document.filename
+    )
 

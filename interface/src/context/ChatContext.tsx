@@ -21,6 +21,7 @@ interface Conversation {
   updated_at: string;
   message_count: number;
   messages?: Message[];
+  attached_documents?: Document[];
 }
 
 interface Document {
@@ -37,6 +38,8 @@ interface ChatContextType {
   currentConversation: Conversation | null;
   selectedDocuments: number[];
   isLoading: boolean;
+  viewingDocument: { id: number; filename: string } | null;
+  setViewingDocument: (doc: { id: number; filename: string } | null) => void;
   loadConversations: () => Promise<void>;
   loadDocuments: () => Promise<void>;
   createConversation: (title?: string) => Promise<Conversation>;
@@ -47,6 +50,8 @@ interface ChatContextType {
   toggleDocumentSelection: (documentId: number) => void;
   clearDocumentSelection: () => void;
   refreshCurrentConversation: () => Promise<void>;
+  attachDocument: (conversationId: number, documentId: number) => Promise<void>;
+  detachDocument: (conversationId: number, documentId: number) => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -58,6 +63,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
   const [selectedDocuments, setSelectedDocuments] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [viewingDocument, setViewingDocument] = useState<{ id: number; filename: string } | null>(null);
 
   const loadConversations = useCallback(async () => {
     if (!token) return;
@@ -104,6 +110,19 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const selectConversation = async (conversationId: number) => {
     if (!token) return;
+    
+    // Clean up empty conversations before switching
+    if (currentConversation && currentConversation.id !== conversationId) {
+      const messageCount = currentConversation.messages?.length || currentConversation.message_count || 0;
+      if (messageCount === 0) {
+        try {
+          await conversationsApi.delete(token, currentConversation.id);
+          setConversations((prev) => prev.filter((c) => c.id !== currentConversation.id));
+        } catch (error) {
+          console.error('Failed to delete empty conversation:', error);
+        }
+      }
+    }
     
     setIsLoading(true);
     try {
@@ -183,6 +202,36 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setSelectedDocuments([]);
   };
 
+  const attachDocument = async (conversationId: number, documentId: number) => {
+    if (!token) throw new Error('Not authenticated');
+    
+    try {
+      await conversationsApi.attachDocument(token, conversationId, documentId);
+      // Refresh conversation to get updated attached documents
+      if (currentConversation?.id === conversationId) {
+        await refreshCurrentConversation();
+      }
+    } catch (error) {
+      console.error('Failed to attach document:', error);
+      throw error;
+    }
+  };
+
+  const detachDocument = async (conversationId: number, documentId: number) => {
+    if (!token) throw new Error('Not authenticated');
+    
+    try {
+      await conversationsApi.detachDocument(token, conversationId, documentId);
+      // Refresh conversation to get updated attached documents
+      if (currentConversation?.id === conversationId) {
+        await refreshCurrentConversation();
+      }
+    } catch (error) {
+      console.error('Failed to detach document:', error);
+      throw error;
+    }
+  };
+
   return (
     <ChatContext.Provider
       value={{
@@ -191,6 +240,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         currentConversation,
         selectedDocuments,
         isLoading,
+        viewingDocument,
+        setViewingDocument,
         loadConversations,
         loadDocuments,
         createConversation,
@@ -201,6 +252,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         toggleDocumentSelection,
         clearDocumentSelection,
         refreshCurrentConversation,
+        attachDocument,
+        detachDocument,
       }}
     >
       {children}

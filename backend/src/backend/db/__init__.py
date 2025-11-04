@@ -2,7 +2,7 @@
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
-from .models import Base, User, Session, Conversation, Message, Document
+from .models import Base, User, Session, Conversation, Message, Document, ApiKey, ConversationDocument
 
 # Global session factory
 SessionLocal = None
@@ -41,5 +41,5 @@ def get_db():
     return SessionLocal()
 
 
-__all__ = ['init_db', 'get_db', 'User', 'Session', 'Conversation', 'Message', 'Document']
+__all__ = ['init_db', 'get_db', 'User', 'Session', 'Conversation', 'Message', 'Document', 'ApiKey', 'ConversationDocument']
 

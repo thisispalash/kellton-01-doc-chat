@@ -23,6 +23,7 @@ class User(Base):
     sessions = relationship('Session', back_populates='user', cascade='all, delete-orphan')
     conversations = relationship('Conversation', back_populates='user', cascade='all, delete-orphan')
     documents = relationship('Document', back_populates='user', cascade='all, delete-orphan')
+    api_keys = relationship('ApiKey', back_populates='user', cascade='all, delete-orphan')
     
     def set_password(self, password):
         """Hash and set the user's password."""
@@ -96,8 +97,9 @@ class Conversation(Base):
     # Relationships
     user = relationship('User', back_populates='conversations')
     messages = relationship('Message', back_populates='conversation', cascade='all, delete-orphan', order_by='Message.timestamp')
+    conversation_documents = relationship('ConversationDocument', back_populates='conversation', cascade='all, delete-orphan')
     
-    def to_dict(self, include_messages=False):
+    def to_dict(self, include_messages=False, include_documents=False):
         """Convert conversation to dictionary."""
         data = {
             'id': self.id,
@@ -109,6 +111,8 @@ class Conversation(Base):
         }
         if include_messages:
             data['messages'] = [msg.to_dict() for msg in self.messages]
+        if include_documents:
+            data['attached_documents'] = [cd.document.to_dict() for cd in self.conversation_documents]
         return data
 
 
@@ -151,6 +155,7 @@ class Document(Base):
     
     # Relationships
     user = relationship('User', back_populates='documents')
+    conversation_documents = relationship('ConversationDocument', back_populates='document', cascade='all, delete-orphan')
     
     def to_dict(self):
         """Convert document to dictionary."""
@@ -160,5 +165,56 @@ class Document(Base):
             'filename': self.filename,
             'chroma_collection_id': self.chroma_collection_id,
             'uploaded_at': self.uploaded_at.isoformat() if self.uploaded_at else None
+        }
+
+
+class ApiKey(Base):
+    """API Key model for storing encrypted user API keys."""
+    __tablename__ = 'api_keys'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    provider = Column(String(50), nullable=False)  # 'openai', 'anthropic', 'google', 'grok'
+    encrypted_key = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship('User', back_populates='api_keys')
+    
+    def to_dict(self, include_key=False):
+        """Convert API key to dictionary."""
+        data = {
+            'id': self.id,
+            'user_id': self.user_id,
+            'provider': self.provider,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+        if include_key:
+            data['encrypted_key'] = self.encrypted_key
+        return data
+
+
+class ConversationDocument(Base):
+    """Junction table for many-to-many relationship between conversations and documents."""
+    __tablename__ = 'conversation_documents'
+    
+    id = Column(Integer, primary_key=True)
+    conversation_id = Column(Integer, ForeignKey('conversations.id'), nullable=False)
+    document_id = Column(Integer, ForeignKey('documents.id'), nullable=False)
+    attached_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    conversation = relationship('Conversation', back_populates='conversation_documents')
+    document = relationship('Document', back_populates='conversation_documents')
+    
+    def to_dict(self):
+        """Convert conversation document to dictionary."""
+        return {
+            'id': self.id,
+            'conversation_id': self.conversation_id,
+            'document_id': self.document_id,
+            'attached_at': self.attached_at.isoformat() if self.attached_at else None
         }
 

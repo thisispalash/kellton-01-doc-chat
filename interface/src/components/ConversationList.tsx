@@ -6,13 +6,19 @@ import { MessageSquare, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function ConversationList() {
-  const { conversations, currentConversation, selectConversation, deleteConversation } = useChat();
+  const { conversations, currentConversation, selectConversation, deleteConversation, setViewingDocument } = useChat();
 
   const handleDelete = async (e: React.MouseEvent, conversationId: number) => {
     e.stopPropagation();
     if (confirm('Delete this conversation?')) {
       await deleteConversation(conversationId);
     }
+  };
+
+  const handleConversationClick = (conversationId: number) => {
+    // Close document viewer when switching conversations
+    setViewingDocument(null);
+    selectConversation(conversationId);
   };
 
   return (
@@ -27,14 +33,14 @@ export default function ConversationList() {
           </p>
         ) : (
           conversations.map((conv) => (
-            <div
-              key={conv.id}
-              className={cn(
-                'group flex items-center justify-between px-3 py-2 rounded-md cursor-pointer hover:bg-accent transition-colors',
-                currentConversation?.id === conv.id && 'bg-accent'
-              )}
-              onClick={() => selectConversation(conv.id)}
-            >
+              <div
+                key={conv.id}
+                className={cn(
+                  'group flex items-center justify-between px-3 py-2 rounded-md cursor-pointer hover:bg-accent transition-colors',
+                  currentConversation?.id === conv.id && 'bg-accent'
+                )}
+                onClick={() => handleConversationClick(conv.id)}
+              >
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <MessageSquare className="w-4 h-4 flex-shrink-0" />
                 <div className="flex-1 min-w-0">

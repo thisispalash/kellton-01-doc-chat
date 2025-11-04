@@ -7,7 +7,9 @@ from ..app import socketio
 from ..auth import get_user_by_session_token
 from ..db import get_db, Conversation, Message, Document
 from ..store import search_multiple_documents, get_context_from_results
-from ..utils import stream_llm_response
+from ..utils import get_provider_from_model
+from ..utils.llm_providers import get_provider
+from .settings import get_user_api_key
 
 # Store connected users
 connected_users = {}
@@ -74,7 +76,6 @@ def handle_chat_message(data):
     conversation_id = data.get('conversation_id')
     user_message = data.get('message')
     model = data.get('model', 'gpt-4')
-    selected_doc_ids = data.get('selected_doc_ids', [])
     
     if not conversation_id or not user_message:
         emit('error', {'message': 'conversation_id and message are required'})
@@ -90,6 +91,16 @@ def handle_chat_message(data):
         return
     
     try:
+        # Get user's API key for the selected model
+        provider_name = get_provider_from_model(model)
+        api_key = get_user_api_key(user_id, provider_name)
+        
+        if not api_key:
+            emit('error', {
+                'message': f'No API key configured for {provider_name}. Please add your API key in settings.'
+            })
+            return
+        
         # Save user message to database
         user_msg = Message(
             conversation_id=conversation_id,
@@ -104,12 +115,15 @@ def handle_chat_message(data):
         # Emit acknowledgment
         emit('message_saved', {'message_id': user_msg.id})
         
-        # Perform RAG if documents are selected
+        # Get attached documents from conversation
+        attached_doc_ids = [cd.document_id for cd in conversation.conversation_documents]
+        
+        # Perform RAG if documents are attached
         context = ""
-        if selected_doc_ids:
-            # Get collection names for selected documents
+        if attached_doc_ids:
+            # Get collection names for attached documents
             documents = db.query(Document).filter(
-                Document.id.in_(selected_doc_ids),
+                Document.id.in_(attached_doc_ids),
                 Document.user_id == user_id
             ).all()
             
@@ -165,12 +179,16 @@ def handle_chat_message(data):
             'content': user_message
         })
         
-        # Stream LLM response
+        # Stream LLM response using user's API key
         full_response = ""
         
         emit('chat_response_start', {'message_id': user_msg.id})
         
-        for chunk in stream_llm_response(messages, model):
+        # Get provider with user's API key
+        provider_class = get_provider(provider_name).__class__
+        provider = provider_class(api_key=api_key)
+        
+        for chunk in provider.stream_chat(messages, model):
             full_response += chunk
             emit('chat_response_chunk', {'chunk': chunk})
         

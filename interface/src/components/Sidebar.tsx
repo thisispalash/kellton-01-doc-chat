@@ -7,6 +7,7 @@ import { Separator } from './ui/separator';
 import ConversationList from './ConversationList';
 import DocumentList from './DocumentList';
 import DocumentUpload from './DocumentUpload';
+import SettingsDialog from './SettingsDialog';
 import { Plus, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
@@ -35,9 +36,12 @@ export default function Sidebar() {
       <div className="p-4 border-b">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-xl font-bold">Doc Chat</h1>
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <SettingsDialog />
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">
           Welcome, {user?.username}

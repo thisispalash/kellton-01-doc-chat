@@ -7,14 +7,14 @@ import MessageBubble from './MessageBubble';
 import ModelSelector from './ModelSelector';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function ChatArea() {
-  const { currentConversation, selectedDocuments, documents, refreshCurrentConversation } = useChat();
+  const { currentConversation, refreshCurrentConversation, setViewingDocument } = useChat();
   const { socket, isConnected, sendMessage } = useWebSocket();
   const [message, setMessage] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gpt-4');
+  const [selectedModel, setSelectedModel] = useState('gpt-5-nano');
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -76,17 +76,14 @@ export default function ChatArea() {
       conversation_id: currentConversation.id,
       message: messageToSend,
       model: selectedModel,
-      selected_doc_ids: selectedDocuments,
     });
 
     // Refresh to show user message
     setTimeout(() => refreshCurrentConversation(), 100);
   };
 
-  const selectedDocNames = documents
-    .filter((doc) => selectedDocuments.includes(doc.id))
-    .map((doc) => doc.filename)
-    .join(', ');
+  const attachedDocs = currentConversation?.attached_documents || [];
+  const attachedDocNames = attachedDocs.map((doc) => doc.filename).join(', ');
 
   if (!currentConversation) {
     return (
@@ -102,27 +99,42 @@ export default function ChatArea() {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-background">
+    <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="border-b p-4 flex items-center justify-between">
-        <div>
+      <div className="border-b p-4 flex-shrink-0">
+        <div className="flex items-center justify-between mb-2">
           <h2 className="text-lg font-semibold">{currentConversation.title}</h2>
-          {selectedDocNames && (
-            <p className="text-sm text-muted-foreground">
-              Documents: {selectedDocNames}
-            </p>
-          )}
+          <div className="flex items-center gap-2">
+            <ModelSelector value={selectedModel} onChange={setSelectedModel} />
+            <div
+              className={cn(
+                'w-2 h-2 rounded-full',
+                isConnected ? 'bg-green-500' : 'bg-red-500'
+              )}
+              title={isConnected ? 'Connected' : 'Disconnected'}
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <ModelSelector value={selectedModel} onChange={setSelectedModel} />
-          <div
-            className={cn(
-              'w-2 h-2 rounded-full',
-              isConnected ? 'bg-green-500' : 'bg-red-500'
-            )}
-            title={isConnected ? 'Connected' : 'Disconnected'}
-          />
-        </div>
+        {attachedDocs.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {attachedDocs.map((doc) => (
+              <div
+                key={doc.id}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-accent rounded-md text-xs cursor-pointer hover:bg-accent/80 transition-colors"
+                onClick={() => setViewingDocument({ id: doc.id, filename: doc.filename })}
+                title="Click to view document"
+              >
+                <FileText className="w-3 h-3" />
+                <span>{doc.filename}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {attachedDocs.length === 0 && (
+          <p className="text-xs text-muted-foreground mt-1">
+            No documents attached. Attach documents from the sidebar to use RAG.
+          </p>
+        )}
       </div>
 
       {/* Messages */}
@@ -156,7 +168,7 @@ export default function ChatArea() {
       </div>
 
       {/* Input */}
-      <div className="border-t p-4">
+      <div className="border-t p-4 flex-shrink-0">
         <form onSubmit={handleSendMessage} className="flex gap-2">
           <Input
             value={message}

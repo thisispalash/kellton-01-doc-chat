@@ -102,6 +102,41 @@ export const conversationsApi = {
       method: 'DELETE',
       token,
     }),
+
+  attachDocument: (token: string, conversationId: number, documentId: number) =>
+    apiRequest<any>(`/api/conversations/${conversationId}/documents`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ document_id: documentId }),
+    }),
+
+  detachDocument: (token: string, conversationId: number, documentId: number) =>
+    apiRequest<{ message: string }>(`/api/conversations/${conversationId}/documents/${documentId}`, {
+      method: 'DELETE',
+      token,
+    }),
+};
+
+// Settings API
+export const settingsApi = {
+  getApiKeys: (token: string) =>
+    apiRequest<any[]>('/api/settings/api-keys', {
+      method: 'GET',
+      token,
+    }),
+
+  saveApiKey: (token: string, provider: string, apiKey: string) =>
+    apiRequest<{ message: string }>('/api/settings/api-keys', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ provider, api_key: apiKey }),
+    }),
+
+  deleteApiKey: (token: string, provider: string) =>
+    apiRequest<{ message: string }>(`/api/settings/api-keys/${provider}`, {
+      method: 'DELETE',
+      token,
+    }),
 };
 
 // Documents API
