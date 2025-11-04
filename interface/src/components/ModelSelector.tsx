@@ -4,22 +4,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 
 const MODELS = {
   'OpenAI': [
-    { id: 'gpt-4', name: 'GPT-4' },
-    { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
-    { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
+    { id: 'gpt-5-nano', name: 'GPT-5 Nano' },
   ],
-  'Anthropic': [
-    { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
-    { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
-    { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
-  ],
-  'Google': [
-    { id: 'gemini-pro', name: 'Gemini Pro' },
-    { id: 'gemini-pro-vision', name: 'Gemini Pro Vision' },
-  ],
-  'Grok': [
-    { id: 'grok-beta', name: 'Grok Beta' },
-  ],
+  // 'Anthropic': [
+  //   { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
+  //   { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
+  //   { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
+  // ],
+  // 'Google': [
+  //   { id: 'gemini-pro', name: 'Gemini Pro' },
+  //   { id: 'gemini-pro-vision', name: 'Gemini Pro Vision' },
+  // ],
+  // 'Grok': [
+  //   { id: 'grok-beta', name: 'Grok Beta' },
+  // ],
 };
 
 interface ModelSelectorProps {
