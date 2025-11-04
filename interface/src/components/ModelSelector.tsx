@@ -4,20 +4,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 
 const MODELS = {
   'OpenAI': [
-    { id: 'gpt-5-nano', name: 'GPT-5 Nano' },
+    { id: 'gpt-5-nano', name: 'GPT-5 Nano' }, // $0.05/1M, $0.40/1M
   ],
-  // 'Anthropic': [
-  //   { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
-  //   { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
-  //   { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
-  // ],
-  // 'Google': [
-  //   { id: 'gemini-pro', name: 'Gemini Pro' },
-  //   { id: 'gemini-pro-vision', name: 'Gemini Pro Vision' },
-  // ],
-  // 'Grok': [
-  //   { id: 'grok-beta', name: 'Grok Beta' },
-  // ],
+  'Anthropic': [
+    { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5' }, // $3/MTok, $15/MTok
+    { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' }, // $1/MTok, $5/MTok
+    { id: 'claude-3-5-haiku-20241022', name: 'Claude Haiku 3.5' }, // $0.80/MTok, $4/MTok
+  ],
+  'Google': [
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' }, // $0.30/1M, $2.50/1M
+    { id: 'gemini-2.5-flash-preview-09-2025', name: 'Gemini 2.5 Flash Preview 09/2025' }, // $0.30/1M, $2.50/1M
+    { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite' }, // $0.10/1M, $0.40/1M
+    { id: 'gemini-2.5-flash-lite-preview-09-2025', name: 'Gemini 2.5 Flash Lite Preview 09/2025' }, // $0.10/1M, $0.40/1M
+  ],
+  'Grok': [
+    { id: 'grok-4-fast-reasoning', name: 'Grok 4 Fast Reasoning' }, // $0.20/1M, $0.50/1M
+    { id: 'grok-4-0709', name: 'Grok 4' }, // $3/1M, $15/1M
+    { id: 'grok-3-mini', name: 'Grok 3 Mini' }, // $0.30/1M, $0.50/1M
+  ],
 };
 
 interface ModelSelectorProps {
