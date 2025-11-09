@@ -1,182 +1,194 @@
 /**
- * API client for making requests to the backend.
+ * API client for making requests to the backend using axios.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+import apiClient, { apiHelpers, ApiError, AuthError, NetworkError } from '../lib/axios';
 
-interface ApiOptions extends RequestInit {
+interface ApiOptions {
   token?: string;
+  headers?: Record<string, string>;
 }
 
+// Re-export error types for backward compatibility
+export { ApiError, AuthError, NetworkError };
+
+// Helper function for API requests (maintaining similar interface for easier migration)
 async function apiRequest<T>(
   endpoint: string,
   options: ApiOptions = {}
 ): Promise<T> {
-  const { token, ...fetchOptions } = options;
+  const { token, headers = {} } = options;
 
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...fetchOptions.headers,
+  const config = {
+    headers: {
+      ...headers,
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
   };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  try {
+    const response = await apiClient.get(endpoint, config);
+    return response.data;
+  } catch (error) {
+    if (error instanceof ApiError || error instanceof AuthError || error instanceof NetworkError) {
+      throw error;
+    }
+    throw new Error('Request failed');
   }
+}
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...fetchOptions,
-    headers,
-  });
+// Helper function for POST requests
+async function apiPost<T>(
+  endpoint: string,
+  data?: any,
+  options: ApiOptions = {}
+): Promise<T> {
+  const { token, headers = {} } = options;
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(error.error || `HTTP ${response.status}`);
+  const config = {
+    headers: {
+      ...headers,
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  };
+
+  try {
+    const response = await apiClient.post(endpoint, data, config);
+    return response.data;
+  } catch (error) {
+    if (error instanceof ApiError || error instanceof AuthError || error instanceof NetworkError) {
+      throw error;
+    }
+    throw new Error('Request failed');
   }
+}
 
-  return response.json();
+// Helper function for PUT requests
+async function apiPut<T>(
+  endpoint: string,
+  data?: any,
+  options: ApiOptions = {}
+): Promise<T> {
+  const { token, headers = {} } = options;
+
+  const config = {
+    headers: {
+      ...headers,
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  };
+
+  try {
+    const response = await apiClient.put(endpoint, data, config);
+    return response.data;
+  } catch (error) {
+    if (error instanceof ApiError || error instanceof AuthError || error instanceof NetworkError) {
+      throw error;
+    }
+    throw new Error('Request failed');
+  }
+}
+
+// Helper function for DELETE requests
+async function apiDelete<T>(
+  endpoint: string,
+  options: ApiOptions = {}
+): Promise<T> {
+  const { token, headers = {} } = options;
+
+  const config = {
+    headers: {
+      ...headers,
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+  };
+
+  try {
+    const response = await apiClient.delete(endpoint, config);
+    return response.data;
+  } catch (error) {
+    if (error instanceof ApiError || error instanceof AuthError || error instanceof NetworkError) {
+      throw error;
+    }
+    throw new Error('Request failed');
+  }
 }
 
 // Auth API
 export const authApi = {
   checkPassword: (password: string) =>
-    apiRequest<{ exists: boolean; user_id?: number }>('/api/auth/check-password', {
-      method: 'POST',
-      body: JSON.stringify({ password }),
-    }),
+    apiPost<{ exists: boolean; user_id?: number }>('/api/auth/check-password', { password }),
 
   login: (username: string, password: string) =>
-    apiRequest<{ session_token: string; user: any; expires_at: string }>('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, password }),
-    }),
+    apiPost<{ session_token: string; user: any; expires_at: string }>('/api/auth/login', { username, password }),
 
   register: (username: string, password: string) =>
-    apiRequest<{ session_token: string; user: any; expires_at: string }>('/api/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ username, password }),
-    }),
+    apiPost<{ session_token: string; user: any; expires_at: string }>('/api/auth/register', { username, password }),
 
   logout: (token: string) =>
-    apiRequest('/api/auth/logout', {
-      method: 'POST',
-      token,
-    }),
+    apiPost('/api/auth/logout', undefined, { token }),
 
   me: (token: string) =>
-    apiRequest<any>('/api/auth/me', {
-      method: 'GET',
-      token,
-    }),
+    apiRequest<any>('/api/auth/me', { token }),
 };
 
 // Conversations API
 export const conversationsApi = {
   list: (token: string) =>
-    apiRequest<any[]>('/api/conversations', {
-      method: 'GET',
-      token,
-    }),
+    apiRequest<any[]>('/api/conversations', { token }),
 
   create: (token: string, title?: string) =>
-    apiRequest<any>('/api/conversations', {
-      method: 'POST',
-      token,
-      body: JSON.stringify({ title }),
-    }),
+    apiPost<any>('/api/conversations', { title }, { token }),
 
   get: (token: string, conversationId: number) =>
-    apiRequest<any>(`/api/conversations/${conversationId}`, {
-      method: 'GET',
-      token,
-    }),
+    apiRequest<any>(`/api/conversations/${conversationId}`, { token }),
 
   update: (token: string, conversationId: number, title: string) =>
-    apiRequest<any>(`/api/conversations/${conversationId}`, {
-      method: 'PUT',
-      token,
-      body: JSON.stringify({ title }),
-    }),
+    apiPut<any>(`/api/conversations/${conversationId}`, { title }, { token }),
 
   delete: (token: string, conversationId: number) =>
-    apiRequest<{ message: string }>(`/api/conversations/${conversationId}`, {
-      method: 'DELETE',
-      token,
-    }),
+    apiDelete<{ message: string }>(`/api/conversations/${conversationId}`, { token }),
 
   attachDocument: (token: string, conversationId: number, documentId: number) =>
-    apiRequest<any>(`/api/conversations/${conversationId}/documents`, {
-      method: 'POST',
-      token,
-      body: JSON.stringify({ document_id: documentId }),
-    }),
+    apiPost<any>(`/api/conversations/${conversationId}/documents`, { document_id: documentId }, { token }),
 
   detachDocument: (token: string, conversationId: number, documentId: number) =>
-    apiRequest<{ message: string }>(`/api/conversations/${conversationId}/documents/${documentId}`, {
-      method: 'DELETE',
-      token,
-    }),
+    apiDelete<{ message: string }>(`/api/conversations/${conversationId}/documents/${documentId}`, { token }),
 };
 
 // Settings API
 export const settingsApi = {
   getApiKeys: (token: string) =>
-    apiRequest<any[]>('/api/settings/api-keys', {
-      method: 'GET',
-      token,
-    }),
+    apiRequest<any[]>('/api/settings/api-keys', { token }),
 
   saveApiKey: (token: string, provider: string, apiKey: string) =>
-    apiRequest<{ message: string }>('/api/settings/api-keys', {
-      method: 'POST',
-      token,
-      body: JSON.stringify({ provider, api_key: apiKey }),
-    }),
+    apiPost<{ message: string }>('/api/settings/api-keys', { provider, api_key: apiKey }, { token }),
 
   deleteApiKey: (token: string, provider: string) =>
-    apiRequest<{ message: string }>(`/api/settings/api-keys/${provider}`, {
-      method: 'DELETE',
-      token,
-    }),
+    apiDelete<{ message: string }>(`/api/settings/api-keys/${provider}`, { token }),
 };
 
 // Documents API
 export const documentsApi = {
   list: (token: string) =>
-    apiRequest<any[]>('/api/documents', {
-      method: 'GET',
-      token,
-    }),
+    apiRequest<any[]>('/api/documents', { token }),
 
   upload: async (token: string, file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await fetch(`${API_URL}/api/documents/upload`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Upload failed' }));
-      throw new Error(error.error || `HTTP ${response.status}`);
+    try {
+      const response = await apiHelpers.uploadFile('/api/documents/upload', file, token);
+      return response.data;
+    } catch (error) {
+      if (error instanceof ApiError || error instanceof AuthError || error instanceof NetworkError) {
+        throw error;
+      }
+      throw new Error('Upload failed');
     }
-
-    return response.json();
   },
 
   get: (token: string, documentId: number) =>
-    apiRequest<any>(`/api/documents/${documentId}`, {
-      method: 'GET',
-      token,
-    }),
+    apiRequest<any>(`/api/documents/${documentId}`, { token }),
 
   delete: (token: string, documentId: number) =>
-    apiRequest<{ message: string }>(`/api/documents/${documentId}`, {
-      method: 'DELETE',
-      token,
-    }),
+    apiDelete<{ message: string }>(`/api/documents/${documentId}`, { token }),
 };
 
