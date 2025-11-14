@@ -14,12 +14,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from backend.db import get_db, Document, User
-from backend.store import (
-    get_chroma_client,
-    get_collection,
-    get_or_create_user_collection,
-    delete_collection
-)
+from backend.store import get_chroma_client, get_or_create_user_collection
+from backend.store.legacy import get_collection, delete_collection
 from backend.db.migrations import Migration
 
 

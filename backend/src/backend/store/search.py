@@ -1,67 +1,7 @@
 """Vector search functionality."""
 
-from .chroma_client import get_collection, get_or_create_user_collection
+from .chroma_client import get_or_create_user_collection
 from .embeddings import generate_embedding
-
-
-def search_documents(collection_name, query_text, n_results=5):
-    """Search for relevant document chunks using cosine similarity.
-    
-    Args:
-        collection_name: Name of the ChromaDB collection
-        query_text: Query text to search for
-        n_results: Number of results to return (default: 5)
-        
-    Returns:
-        List of result dicts with 'text', 'metadata', 'distance'
-    """
-    collection = get_collection(collection_name)
-    
-    if not collection:
-        return []
-    
-    # Generate embedding for query
-    query_embedding = generate_embedding(query_text)
-    
-    # Perform search
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=n_results,
-        include=['documents', 'metadatas', 'distances']
-    )
-    
-    # Format results
-    formatted_results = []
-    if results and results['documents'] and results['documents'][0]:
-        for i in range(len(results['documents'][0])):
-            formatted_results.append({
-                'text': results['documents'][0][i],
-                'metadata': results['metadatas'][0][i],
-                'distance': results['distances'][0][i]
-            })
-    
-    return formatted_results
-
-
-def search_multiple_documents(collection_names, query_text, n_results_per_doc=5):
-    """Search across multiple document collections.
-    
-    Args:
-        collection_names: List of collection names to search
-        query_text: Query text to search for
-        n_results_per_doc: Number of results to return per document (default: 5)
-        
-    Returns:
-        Dict mapping collection_name to list of results
-    """
-    all_results = {}
-    
-    for collection_name in collection_names:
-        results = search_documents(collection_name, query_text, n_results_per_doc)
-        if results:
-            all_results[collection_name] = results
-    
-    return all_results
 
 
 def search_user_documents(user_id, query_text, doc_ids=None, n_results=10):

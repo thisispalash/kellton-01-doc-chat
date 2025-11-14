@@ -6,7 +6,7 @@ from datetime import datetime
 from ..app import socketio
 from ..auth import get_user_by_session_token
 from ..db import get_db, Conversation, Message, Document
-from ..store import search_multiple_documents, search_user_documents, get_context_from_results
+from ..store import search_user_documents, get_context_from_results
 from ..utils import get_provider_from_model
 from ..utils.llm_providers import get_provider
 from .settings import get_user_api_key

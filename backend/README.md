@@ -290,6 +290,34 @@ where={"folder_id": "42"}
 where={"tags": {"$contains": "research"}}
 ```
 
+## Migrating from Old Installation
+
+If you have an existing installation with the old per-document collection architecture, you need to run the migration:
+
+```bash
+cd backend
+
+# Preview what will happen (safe, read-only)
+python run_migrations.py --dry-run
+
+# Check current migration status
+python run_migrations.py --status
+
+# Run the migration
+python run_migrations.py
+
+# If something goes wrong, rollback
+python run_migrations.py --rollback
+```
+
+**What this does:**
+- Consolidates all per-document collections into per-user collections
+- Preserves all document data and metadata
+- Updates database records with new collection names
+- Cleans up old collections
+
+**Note:** New installations automatically use the new architecture and don't need migration.
+
 ## Development
 
 ### Setup

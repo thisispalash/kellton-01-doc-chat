@@ -9,9 +9,6 @@ from ..storage import save_file, delete_file
 from ..store import (
     process_pdf_to_chunks,
     generate_embeddings,
-    create_collection,
-    add_documents_to_collection,
-    delete_collection,
     add_documents_to_user_collection,
     remove_document_from_collection
 )

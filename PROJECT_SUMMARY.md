@@ -18,17 +18,17 @@ A fully functional, locally-hosted document chat application with user authentic
 - Text chunking with configurable overlap
 - Local embedding generation using sentence-transformers
 - ChromaDB for vector storage (fully local)
-- Per-document collections for organized storage
+- **Per-user collections:** All documents in unified collection with metadata filtering
 - **Conversation-Document Attachments:** Documents persist with conversations
 - **Split View:** Resizable PDF viewer alongside chat interface
 - **Authenticated PDF Serving:** Secure endpoint for viewing documents
 
 ### RAG (Retrieval Augmented Generation)
 - Cosine similarity search on user queries
-- Multi-document context support (conversation-attached documents)
-- Top-K relevant chunks retrieval
+- **Automatic search across all user documents** - no manual attachment needed
+- Top-K relevant chunks retrieval from unified user collection
 - Automatic context building for LLM prompts
-- **Persistent Document Context:** Documents stay attached across sessions
+- Metadata-based filtering ready for future folder/project features
 
 ### Chat System
 - Real-time WebSocket communication
@@ -213,33 +213,31 @@ A fully functional, locally-hosted document chat application with user authentic
 
 ### Document Processing Pipeline
 1. User uploads PDF via dialog
-2. Backend saves file to `uploads/{user_id}/{doc_id}.pdf`
+2. Backend saves file to `uploads/{user_id}/{doc_id}/filename.pdf`
 3. Extract text from each page using pypdf
 4. Chunk text with overlap (500 chars, 50 char overlap)
 5. Generate embeddings using sentence-transformers
-6. Create ChromaDB collection: `doc_{user_id}_{doc_id}`
-7. Store chunks with metadata (page number, chunk index)
+6. Store chunks in user's collection: `user_{user_id}_default`
+7. Chunks include metadata: doc_id, page_number, chunk_index
 8. Save document record in SQLite
 
 ### Chat with RAG Flow
 1. User types message in a conversation
 2. Frontend sends via WebSocket: `{conversation_id, message, model}`
 3. Backend saves user message to database
-4. **Retrieve conversation's attached documents:**
-   - Query `conversation_documents` junction table
-   - Get document IDs for the current conversation
-5. **If documents attached:**
+4. **Automatic RAG across all user documents:**
    - Generate query embedding
-   - Search each attached document's ChromaDB collection (top 5 chunks per doc)
-   - Build context from retrieved chunks
-6. **Retrieve user's API key:**
+   - Search user's unified collection: `user_{user_id}_default`
+   - Retrieve top 10 relevant chunks across all documents
+   - Build context from retrieved chunks with doc_id metadata
+5. **Retrieve user's API key:**
    - Query encrypted API key from database for selected model provider
    - Decrypt using Fernet
-7. Construct LLM prompt with context + conversation history
-8. Stream response from selected LLM provider using user's API key
-9. Emit chunks to frontend via WebSocket
-10. Save assistant response to database
-11. Update conversation timestamp
+6. Construct LLM prompt with context + conversation history
+7. Stream response from selected LLM provider using user's API key
+8. Emit chunks to frontend via WebSocket
+9. Save assistant response to database
+10. Update conversation timestamp
 
 ### WebSocket Communication
 - **Connection:** Authenticate with session token
@@ -348,15 +346,21 @@ chmod +x setup.sh start.sh
 - [x] **Clickable Document Badges:** Quick PDF viewing from chat header
 - [x] **Settings Dialog:** Manage all provider API keys in one place
 - [x] **Improved UX:** Click documents to create conversations with them attached
+- [x] **Per-User Collections:** Migrated from per-document to unified per-user ChromaDB collections
+- [x] **Automatic RAG:** All user documents automatically searched on every query
+- [x] **Migration Framework:** Reusable system for future schema changes
+- [x] **Legacy Code Cleanup:** Removed old architecture, clean codebase
 
 ## Future Enhancements
 
 ### Potential Features
+- [ ] **Folders/Projects:** Organize documents with metadata filtering
+- [ ] **Conversation Memory:** Semantic search across past conversations
 - [ ] Support for multiple file types (DOCX, TXT, etc.)
 - [ ] Image upload and vision model support
 - [ ] Conversation sharing and collaboration
 - [ ] Custom embedding models selection
-- [ ] Advanced search filters
+- [ ] Advanced search filters with document-specific queries
 - [ ] Export conversations to PDF/Markdown
 - [ ] Voice input/output
 - [ ] Mobile app (React Native)
