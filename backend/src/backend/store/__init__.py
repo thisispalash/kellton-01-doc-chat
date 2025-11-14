@@ -16,6 +16,8 @@ from .chroma_client import (
 )
 from .search import (
     search_user_documents,
+    search_conversation_memory,
+    format_memory_context,
     get_context_from_results
 )
 
@@ -31,6 +33,8 @@ __all__ = [
     'remove_document_from_collection',
     'add_message_to_conversation_collection',
     'search_user_documents',
+    'search_conversation_memory',
+    'format_memory_context',
     'get_context_from_results'
 ]
 

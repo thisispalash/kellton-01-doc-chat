@@ -37,6 +37,7 @@ A fully functional, locally-hosted document chat application with user authentic
 - Per-message model selection
 - **User-Specific API Keys:** Encrypted storage in database
 - **Smart Cleanup:** Empty conversations auto-deleted on switch
+- **Conversation Memory:** Semantic recall with per-conversation toggle
 - Support for 4 LLM providers:
   - OpenAI (GPT-4, GPT-4 Turbo, GPT-3.5)
   - Anthropic (Claude 3 Opus, Sonnet, Haiku)
@@ -56,6 +57,7 @@ A fully functional, locally-hosted document chat application with user authentic
 - **Settings Dialog:** Manage API keys for all providers
 - **Smart UX:** Click documents to create new conversations
 - **Auto-Cleanup:** Empty conversations removed automatically
+- **Memory Toggle:** Checkbox near chat input to include/exclude conversation memory per thread
 
 ## Architecture
 
@@ -223,21 +225,34 @@ A fully functional, locally-hosted document chat application with user authentic
 
 ### Chat with RAG Flow
 1. User types message in a conversation
-2. Frontend sends via WebSocket: `{conversation_id, message, model}`
+2. Frontend sends via WebSocket: `{conversation_id, message, model, memory_enabled}`
 3. Backend saves user message to database
 4. **Automatic RAG across all user documents:**
    - Generate query embedding
    - Search user's unified collection: `user_{user_id}_default`
    - Retrieve top 10 relevant chunks across all documents
    - Build context from retrieved chunks with doc_id metadata
-5. **Retrieve user's API key:**
+5. **Conversation memory (if enabled for this conversation):**
+   - Search `user_{user_id}_conversations` excluding the current conversation
+   - Retrieve up to `MEMORY_MAX_RESULTS` snippets (user + assistant messages)
+   - Format snippets as \"Relevant Past Discussions\" context
+6. **Retrieve user's API key:**
    - Query encrypted API key from database for selected model provider
    - Decrypt using Fernet
-6. Construct LLM prompt with context + conversation history
-7. Stream response from selected LLM provider using user's API key
-8. Emit chunks to frontend via WebSocket
-9. Save assistant response to database
-10. Update conversation timestamp
+7. Construct LLM prompt with combined document + memory context and recent history
+8. Stream response from selected LLM provider using user's API key
+9. Emit chunks to frontend via WebSocket
+10. Save assistant response to database
+11. Update conversation timestamp
+
+## Conversation Memory
+
+- Every message (user + assistant) is embedded into `user_{user_id}_conversations`
+- Queries search past conversations (excluding the active one) for semantic matches
+- Results are merged with document context for richer prompts
+- Per-conversation checkbox lets users disable memory to save latency (~0.5s) or skip storage
+- Defaults controlled via `MEMORY_ENABLED`, `MEMORY_MAX_RESULTS`, `MEMORY_SEARCH_BOTH_TYPES`
+- Memories are scoped per user and deleted automatically when conversations are removed
 
 ### WebSocket Communication
 - **Connection:** Authenticate with session token
@@ -262,6 +277,9 @@ See SETUP.md for complete API documentation.
 - `EMBEDDING_MODEL` - sentence-transformers model name
 - `CHUNK_SIZE` - Text chunk size (characters)
 - `CHUNK_OVERLAP` - Chunk overlap (characters)
+- `MEMORY_ENABLED` - Enable/disable conversation memory globally (default `true`)
+- `MEMORY_MAX_RESULTS` - Number of memory snippets to fetch per query
+- `MEMORY_SEARCH_BOTH_TYPES` - Include assistant responses when searching memory
 - `SESSION_EXPIRY_HOURS` - Session validity period
 - `CORS_ORIGINS` - Allowed CORS origins
 
@@ -348,6 +366,7 @@ chmod +x setup.sh start.sh
 - [x] **Improved UX:** Click documents to create conversations with them attached
 - [x] **Per-User Collections:** Migrated from per-document to unified per-user ChromaDB collections
 - [x] **Automatic RAG:** All user documents automatically searched on every query
+- [x] **Conversation Memory:** Semantic recall with per-conversation UI toggle
 - [x] **Migration Framework:** Reusable system for future schema changes
 - [x] **Legacy Code Cleanup:** Removed old architecture, clean codebase
 
@@ -355,7 +374,7 @@ chmod +x setup.sh start.sh
 
 ### Potential Features
 - [ ] **Folders/Projects:** Organize documents with metadata filtering
-- [ ] **Conversation Memory:** Semantic search across past conversations
+- [ ] **Advanced Memory Controls:** Importance scoring, summaries, shared memories
 - [ ] Support for multiple file types (DOCX, TXT, etc.)
 - [ ] Image upload and vision model support
 - [ ] Conversation sharing and collaboration

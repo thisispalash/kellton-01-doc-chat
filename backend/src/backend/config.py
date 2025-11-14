@@ -33,6 +33,11 @@ class Config:
     EMBEDDING_MODEL = os.getenv('EMBEDDING_MODEL', 'all-MiniLM-L6-v2')
     CHUNK_SIZE = int(os.getenv('CHUNK_SIZE', '500'))
     CHUNK_OVERLAP = int(os.getenv('CHUNK_OVERLAP', '50'))
+
+    # Memory / Conversation search
+    MEMORY_ENABLED = os.getenv('MEMORY_ENABLED', 'true').lower() == 'true'
+    MEMORY_MAX_RESULTS = int(os.getenv('MEMORY_MAX_RESULTS', '3'))
+    MEMORY_SEARCH_BOTH_TYPES = os.getenv('MEMORY_SEARCH_BOTH_TYPES', 'true').lower() == 'true'
     
     # LLM API Keys
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')

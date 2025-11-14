@@ -75,9 +75,9 @@ The application uses a **per-user collection strategy** where all documents for 
   - Contains all document chunks for a user
   - Metadata includes `doc_id`, `page_number`, `chunk_index`
   
-- **Conversations** (infrastructure ready, not active yet): `user_{user_id}_conversations`
-  - Will contain message/conversation embeddings
-  - For future "memory" feature - semantic search across past conversations
+- **Conversations**: `user_{user_id}_conversations`
+  - Stores conversation memory embeddings (user + assistant messages)
+  - Powers semantic search across past discussions
 
 #### Metadata Structure
 
@@ -230,9 +230,15 @@ ALL_MIGRATIONS = [
 6. LLM generates response with context
 7. Response streamed back to user
 
-### Automatic RAG
+### Automatic RAG + Memory
 
 Every chat message automatically searches all user documents. No need to manually "attach" documents to conversations.
+
+Conversation memory is also enabled by default:
+- Each user/assistant message is embedded and stored in `user_{user_id}_conversations`
+- Past conversations are searched (excluding the current one) for relevant context
+- Results are combined with document context so the assistant can reference past discussions naturally
+- Users can opt in/out per conversation via the \"Include memory\" checkbox next to the chat input (disabling saves ~0.5s latency)
 
 To search specific documents in the future (e.g., folder feature):
 
@@ -246,29 +252,26 @@ search_results = search_user_documents(
 )
 ```
 
+## Conversation Memory
+
+- **Storage**: Every message (user + assistant) is embedded and saved in `user_{user_id}_conversations`
+- **Retrieval**: Incoming queries search past conversations (excluding the current one) for relevant snippets
+- **System Prompt**: Memory snippets are merged with document context so the assistant can reference previous chats
+- **Controls**: Users can toggle memory per conversation via the checkbox near the input; disabling skips storage + retrieval for that request
+- **Config**: Use `MEMORY_ENABLED`, `MEMORY_MAX_RESULTS`, and `MEMORY_SEARCH_BOTH_TYPES` to adjust defaults or disable globally
+- **Privacy**: All data stays local and is scoped per user; deleting a conversation removes its memory entries automatically
+
 ## Future Enhancements
 
-### Conversation Memory
+### Memory Enhancements
 
-The infrastructure is ready for semantic conversation search:
+Now that conversation memory is live, future improvements could include:
 
-1. Message embeddings stored in `user_{user_id}_conversations`
-2. Metadata includes `message_id`, `conversation_id`, `type`
-3. Can search past conversations for context
-4. Enable "memory" feature - recall relevant past discussions
-
-Example future implementation:
-
-```python
-# Search past conversations
-conversation_results = collection.query(
-    query_embeddings=[query_embedding],
-    where={"type": "user_message"},
-    n_results=5
-)
-
-# Include relevant past conversations in context
-```
+1. Recency/importance scoring to prioritize the most useful memories
+2. Conversation summaries to reduce storage/latency
+3. Memory management UI (view, edit, delete individual memories)
+4. Project/folder-aware memory filtering
+5. Per-user defaults stored server-side instead of local state
 
 ### Folders/Projects
 
@@ -337,6 +340,9 @@ FLASK_ENV=development
 SECRET_KEY=your-secret-key
 DATABASE_URL=sqlite:///instance/app.db
 CHROMA_PATH=./chroma_data
+MEMORY_ENABLED=true              # Optional: disable to skip memory globally
+MEMORY_MAX_RESULTS=3             # Optional: number of memory snippets per query
+MEMORY_SEARCH_BOTH_TYPES=true    # Optional: include assistant replies in memory search
 ```
 
 ### Running
