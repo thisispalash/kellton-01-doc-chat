@@ -6,7 +6,7 @@ from datetime import datetime
 from ..app import socketio
 from ..auth import get_user_by_session_token
 from ..db import get_db, Conversation, Message, Document
-from ..store import search_multiple_documents, get_context_from_results
+from ..store import search_multiple_documents, search_user_documents, get_context_from_results
 from ..utils import get_provider_from_model
 from ..utils.llm_providers import get_provider
 from .settings import get_user_api_key
@@ -115,37 +115,30 @@ def handle_chat_message(data):
         # Emit acknowledgment
         emit('message_saved', {'message_id': user_msg.id})
         
-        # Get attached documents from conversation
-        attached_doc_ids = [cd.document_id for cd in conversation.conversation_documents]
-        
-        # Perform RAG if documents are attached
+        # Perform RAG automatically across all user documents
+        # This replaces the old "attached documents" logic with automatic search
         context = ""
-        if attached_doc_ids:
-            # Get collection names for attached documents
-            documents = db.query(Document).filter(
-                Document.id.in_(attached_doc_ids),
-                Document.user_id == user_id
-            ).all()
+        
+        # Check if user has any documents
+        doc_count = db.query(Document).filter_by(user_id=user_id).count()
+        
+        if doc_count > 0:
+            # Search across all user documents automatically
+            search_results = search_user_documents(
+                user_id,
+                user_message,
+                n_results=10
+            )
             
-            if documents:
-                collection_names = [doc.chroma_collection_id for doc in documents]
-                
-                # Search for relevant chunks
-                search_results = search_multiple_documents(
-                    collection_names,
-                    user_message,
-                    n_results_per_doc=5
-                )
-                
-                # Build context from results
-                context = get_context_from_results(search_results, max_chunks=10)
+            # Build context from results
+            context = get_context_from_results(search_results, max_chunks=10)
         
         # Build message history for LLM
         messages = []
         
         # Add system message with context if available
         if context:
-            system_message = (
+            system_message = ( # TODO: Add custom system message for the conversation
                 "You are a helpful assistant. Use the following context from the user's documents "
                 "to answer their question. If the context doesn't contain relevant information, "
                 "you can use your general knowledge.\n\n"

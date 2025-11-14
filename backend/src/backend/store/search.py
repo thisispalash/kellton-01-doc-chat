@@ -1,6 +1,6 @@
 """Vector search functionality."""
 
-from .chroma_client import get_collection
+from .chroma_client import get_collection, get_or_create_user_collection
 from .embeddings import generate_embedding
 
 
@@ -62,6 +62,61 @@ def search_multiple_documents(collection_names, query_text, n_results_per_doc=5)
             all_results[collection_name] = results
     
     return all_results
+
+
+def search_user_documents(user_id, query_text, doc_ids=None, n_results=10):
+    """Search user's documents using their unified collection.
+    
+    This is the new architecture where all user documents are in one collection
+    (user_{user_id}_default) and can be filtered by doc_id if needed.
+    
+    Args:
+        user_id: User ID
+        query_text: Query text to search for
+        doc_ids: Optional list of document IDs to filter by (for folder/project feature)
+        n_results: Number of results to return (default: 10)
+        
+    Returns:
+        List of result dicts with 'text', 'metadata', 'distance'
+    """
+    collection = get_or_create_user_collection(user_id, 'default')
+    
+    # Generate embedding for query
+    query_embedding = generate_embedding(query_text)
+    
+    # Build where clause for filtering if doc_ids provided
+    where_clause = None
+    if doc_ids:
+        # Convert to strings since metadata stores as strings
+        doc_ids_str = [str(doc_id) for doc_id in doc_ids]
+        if len(doc_ids_str) == 1:
+            where_clause = {"doc_id": doc_ids_str[0]}
+        else:
+            where_clause = {"doc_id": {"$in": doc_ids_str}}
+    
+    # Perform search
+    try:
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=n_results,
+            where=where_clause,
+            include=['documents', 'metadatas', 'distances']
+        )
+    except Exception as e:
+        print(f"Error searching user {user_id} documents: {e}")
+        return []
+    
+    # Format results
+    formatted_results = []
+    if results and results['documents'] and results['documents'][0]:
+        for i in range(len(results['documents'][0])):
+            formatted_results.append({
+                'text': results['documents'][0][i],
+                'metadata': results['metadatas'][0][i],
+                'distance': results['distances'][0][i]
+            })
+    
+    return formatted_results
 
 
 def get_context_from_results(results, max_chunks=10):
