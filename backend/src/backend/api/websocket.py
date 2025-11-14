@@ -6,13 +6,32 @@ from datetime import datetime
 from ..app import socketio
 from ..auth import get_user_by_session_token
 from ..db import get_db, Conversation, Message, Document
-from ..store import search_multiple_documents, get_context_from_results
+from ..store import (
+    search_user_documents,
+    search_conversation_memory,
+    get_context_from_results,
+    format_memory_context,
+    add_message_to_conversation_collection,
+    generate_embedding
+)
 from ..utils import get_provider_from_model
 from ..utils.llm_providers import get_provider
 from .settings import get_user_api_key
+from ..config import Config
 
 # Store connected users
 connected_users = {}
+
+
+def _parse_bool(value, default=False):
+    """Utility to parse booleans from various input types."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ('true', '1', 'yes', 'on')
+    return bool(value)
 
 
 @socketio.on('connect')
@@ -76,6 +95,10 @@ def handle_chat_message(data):
     conversation_id = data.get('conversation_id')
     user_message = data.get('message')
     model = data.get('model', 'gpt-4')
+    memory_enabled = _parse_bool(
+        data.get('memory_enabled'),
+        default=Config.MEMORY_ENABLED
+    )
     
     if not conversation_id or not user_message:
         emit('error', {'message': 'conversation_id and message are required'})
@@ -112,44 +135,82 @@ def handle_chat_message(data):
         db.commit()
         db.refresh(user_msg)
         
+        # Store user message embedding in conversation memory (best-effort)
+        if memory_enabled:
+            try:
+                user_embedding = generate_embedding(user_message)
+                add_message_to_conversation_collection(
+                    user_id=user_id,
+                    message_id=user_msg.id,
+                    conversation_id=conversation_id,
+                    text=user_message,
+                    embedding=user_embedding,
+                    message_type='user_message'
+                )
+            except Exception as e:
+                print(f"Warning: Failed to store user message embedding: {e}")
+
         # Emit acknowledgment
         emit('message_saved', {'message_id': user_msg.id})
         
-        # Get attached documents from conversation
-        attached_doc_ids = [cd.document_id for cd in conversation.conversation_documents]
+        # Perform RAG automatically across all user documents
+        document_context = ""
         
-        # Perform RAG if documents are attached
-        context = ""
-        if attached_doc_ids:
-            # Get collection names for attached documents
-            documents = db.query(Document).filter(
-                Document.id.in_(attached_doc_ids),
-                Document.user_id == user_id
-            ).all()
+        # Check if user has any documents
+        doc_count = db.query(Document).filter_by(user_id=user_id).count()
+        
+        if doc_count > 0:
+            # Search across all user documents automatically
+            search_results = search_user_documents(
+                user_id,
+                user_message,
+                n_results=10
+            )
             
-            if documents:
-                collection_names = [doc.chroma_collection_id for doc in documents]
-                
-                # Search for relevant chunks
-                search_results = search_multiple_documents(
-                    collection_names,
+            # Build context from results
+            document_context = get_context_from_results(search_results, max_chunks=10)
+
+        # Retrieve conversation memory context if enabled
+        memory_context = ""
+        if memory_enabled:
+            try:
+                memory_types = None
+                if not Config.MEMORY_SEARCH_BOTH_TYPES:
+                    memory_types = ['user_message']
+
+                memory_results = search_conversation_memory(
+                    user_id,
                     user_message,
-                    n_results_per_doc=5
+                    exclude_conversation_id=conversation_id,
+                    n_results=Config.MEMORY_MAX_RESULTS,
+                    message_types=memory_types
                 )
-                
-                # Build context from results
-                context = get_context_from_results(search_results, max_chunks=10)
+
+                memory_context = format_memory_context(
+                    memory_results,
+                    max_items=Config.MEMORY_MAX_RESULTS
+                )
+            except Exception as e:
+                print(f"Warning: Memory search failed: {e}")
         
         # Build message history for LLM
         messages = []
         
-        # Add system message with context if available
-        if context:
+        # Build system message with combined context if available
+        combined_context_parts = []
+        if document_context:
+            combined_context_parts.append(f"Document Context:\n{document_context}")
+        if memory_context:
+            combined_context_parts.append(f"Relevant Past Discussions:\n{memory_context}")
+
+        combined_context = "\n\n".join(part for part in combined_context_parts if part)
+
+        if combined_context:
             system_message = (
-                "You are a helpful assistant. Use the following context from the user's documents "
-                "to answer their question. If the context doesn't contain relevant information, "
-                "you can use your general knowledge.\n\n"
-                f"Context:\n{context}"
+                "You are a helpful assistant. Use the following information to answer the user's "
+                "question. Reference it naturally when relevant.\n\n"
+                f"{combined_context}\n\n"
+                "If the provided information does not contain an answer, rely on your general knowledge."
             )
         else:
             system_message = "You are a helpful assistant."
@@ -204,6 +265,21 @@ def handle_chat_message(data):
         )
         db.add(assistant_msg)
         
+        # Store assistant message embedding in conversation memory (best-effort)
+        if memory_enabled:
+            try:
+                assistant_embedding = generate_embedding(full_response)
+                add_message_to_conversation_collection(
+                    user_id=user_id,
+                    message_id=assistant_msg.id,
+                    conversation_id=conversation_id,
+                    text=full_response,
+                    embedding=assistant_embedding,
+                    message_type='assistant_message'
+                )
+            except Exception as e:
+                print(f"Warning: Failed to store assistant message embedding: {e}")
+
         # Update conversation timestamp
         conversation.updated_at = datetime.utcnow()
         

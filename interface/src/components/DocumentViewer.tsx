@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { X, FileText, Loader2 } from 'lucide-react';
+import { apiHelpers, ApiError, AuthError, NetworkError } from '../lib/axios';
 
 interface DocumentViewerProps {
   documentId: number;
@@ -24,27 +25,18 @@ export default function DocumentViewer({ documentId, filename, onClose }: Docume
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
-      
       try {
-        const response = await fetch(`${apiUrl}/api/documents/${documentId}/view`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to load PDF');
-        }
-
-        const blob = await response.blob();
+        const response = await apiHelpers.downloadFile(`/api/documents/${documentId}/view`, token);
+        const blob = new Blob([response.data], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         setPdfUrl(url);
         setIsLoading(false);
       } catch (err) {
         console.error('Error loading PDF:', err);
+        if (err instanceof AuthError) {
+          // Token might be invalid, clear it
+          localStorage.removeItem('session_token');
+        }
         setError(true);
         setIsLoading(false);
       }

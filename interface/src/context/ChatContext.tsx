@@ -52,6 +52,8 @@ interface ChatContextType {
   refreshCurrentConversation: () => Promise<void>;
   attachDocument: (conversationId: number, documentId: number) => Promise<void>;
   detachDocument: (conversationId: number, documentId: number) => Promise<void>;
+  memoryEnabled: boolean;
+  setMemoryEnabled: (enabled: boolean) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -64,6 +66,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [selectedDocuments, setSelectedDocuments] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [viewingDocument, setViewingDocument] = useState<{ id: number; filename: string } | null>(null);
+  const [memoryPreferences, setMemoryPreferences] = useState<Record<number, boolean>>({});
 
   const loadConversations = useCallback(async () => {
     if (!token) return;
@@ -97,6 +100,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setDocuments([]);
       setCurrentConversation(null);
       setSelectedDocuments([]);
+      setMemoryPreferences({});
     }
   }, [token, loadConversations, loadDocuments]);
 
@@ -152,6 +156,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     try {
       await conversationsApi.delete(token, conversationId);
       setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+      setMemoryPreferences((prev) => {
+        const updated = { ...prev };
+        delete updated[conversationId];
+        return updated;
+      });
       
       if (currentConversation?.id === conversationId) {
         setCurrentConversation(null);
@@ -232,6 +241,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const memoryEnabled = currentConversation
+    ? memoryPreferences[currentConversation.id] ?? true
+    : true;
+
+  const setMemoryEnabled = (enabled: boolean) => {
+    if (!currentConversation) return;
+    setMemoryPreferences((prev) => ({
+      ...prev,
+      [currentConversation.id]: enabled,
+    }));
+  };
+
   return (
     <ChatContext.Provider
       value={{
@@ -254,6 +275,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         refreshCurrentConversation,
         attachDocument,
         detachDocument,
+        memoryEnabled,
+        setMemoryEnabled,
       }}
     >
       {children}

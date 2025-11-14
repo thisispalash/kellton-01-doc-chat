@@ -11,7 +11,13 @@ import { Send, Loader2, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function ChatArea() {
-  const { currentConversation, refreshCurrentConversation, setViewingDocument } = useChat();
+  const {
+    currentConversation,
+    refreshCurrentConversation,
+    setViewingDocument,
+    memoryEnabled,
+    setMemoryEnabled,
+  } = useChat();
   const { socket, isConnected, sendMessage } = useWebSocket();
   const [message, setMessage] = useState('');
   const [selectedModel, setSelectedModel] = useState('gpt-5-nano');
@@ -76,6 +82,7 @@ export default function ChatArea() {
       conversation_id: currentConversation.id,
       message: messageToSend,
       model: selectedModel,
+      memory_enabled: memoryEnabled,
     });
 
     // Refresh to show user message
@@ -168,7 +175,20 @@ export default function ChatArea() {
       </div>
 
       {/* Input */}
-      <div className="border-t p-4 flex-shrink-0">
+      <div className="border-t p-4 flex-shrink-0 space-y-3">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            id="memory-toggle"
+            className="h-4 w-4 accent-primary"
+            checked={memoryEnabled}
+            onChange={(e) => setMemoryEnabled(e.target.checked)}
+            disabled={!currentConversation}
+          />
+          <label htmlFor="memory-toggle" className="cursor-pointer select-none">
+            Include memory (adds ~0.5s latency but improves recall)
+          </label>
+        </div>
         <form onSubmit={handleSendMessage} className="flex gap-2">
           <Input
             value={message}

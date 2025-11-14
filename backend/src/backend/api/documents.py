@@ -9,9 +9,8 @@ from ..storage import save_file, delete_file
 from ..store import (
     process_pdf_to_chunks,
     generate_embeddings,
-    create_collection,
-    add_documents_to_collection,
-    delete_collection
+    add_documents_to_user_collection,
+    remove_document_from_collection
 )
 
 documents_bp = Blueprint('documents', __name__)
@@ -60,8 +59,8 @@ def upload_document(current_user):
     document.filename = original_filename
     document.file_path = file_path
     
-    # Create ChromaDB collection
-    collection_name = f"doc_{current_user.id}_{document.id}"
+    # Use new user-based collection structure
+    collection_name = f"user_{current_user.id}_default"
     document.chroma_collection_id = collection_name
     
     try:
@@ -77,9 +76,8 @@ def upload_document(current_user):
         texts = [chunk['text'] for chunk in chunks]
         embeddings = generate_embeddings(texts)
         
-        # Create collection and add documents
-        collection = create_collection(collection_name)
-        add_documents_to_collection(collection, chunks, embeddings, document.id)
+        # Add documents to user's collection (creates collection if needed)
+        add_documents_to_user_collection(current_user.id, chunks, embeddings, document.id)
         
         # Commit the document
         db.commit()
@@ -90,7 +88,8 @@ def upload_document(current_user):
     except Exception as e:
         db.rollback()
         delete_file(file_path)
-        delete_collection(collection_name)
+        # Remove document chunks from collection (not the whole collection)
+        remove_document_from_collection(current_user.id, document.id)
         return jsonify({'error': f'Failed to process document: {str(e)}'}), 500
 
 
@@ -154,8 +153,8 @@ def delete_document(current_user, doc_id):
     # Delete file from disk
     delete_file(document.file_path)
     
-    # Delete ChromaDB collection
-    delete_collection(document.chroma_collection_id)
+    # Remove document chunks from user's collection (not the whole collection)
+    remove_document_from_collection(current_user.id, doc_id)
     
     # Delete document record
     db.delete(document)
